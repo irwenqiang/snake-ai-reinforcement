@@ -21,6 +21,7 @@ class PyGameGUI:
     ]
 
     def __init__(self):
+        # initilize pygame evn
         pygame.init()
         self.agent = HumanAgent()
         self.env = None
