@@ -1,5 +1,6 @@
 import numpy as np
 import pygame
+import time
 
 from snakeai.agent import HumanAgent
 from snakeai.gameplay.entities import (CellType, SnakeAction, ALL_SNAKE_DIRECTIONS)
@@ -9,8 +10,8 @@ class PyGameGUI:
     """ Provides a Snake GUI powered by Pygame. """
 
     FPS_LIMIT = 60
-    AI_TIMESTEP_DELAY = 100
-    HUMAN_TIMESTEP_DELAY = 500
+    AI_TIMESTEP_DELAY = 200
+    HUMAN_TIMESTEP_DELAY = 200
     CELL_SIZE = 20
 
     SNAKE_CONTROL_KEYS = [
@@ -21,9 +22,8 @@ class PyGameGUI:
     ]
 
     def __init__(self):
-        # initilize pygame evn
         pygame.init()
-        self.agent = HumanAgent()
+        self.agents = [HumanAgent(), HumanAgent()]
         self.env = None
         self.screen = None
         self.fps_clock = None
@@ -37,9 +37,9 @@ class PyGameGUI:
         self.screen.fill(Colors.SCREEN_BACKGROUND)
         pygame.display.set_caption('Snake')
 
-    def load_agent(self, agent):
+    def load_agent(self, agents):
         """ Load the RL agent into the GUI. """
-        self.agent = agent
+        self.agents = agents
 
     def render_cell(self, x, y):
         """ Draw the cell specified by the field coordinates. """
@@ -96,21 +96,23 @@ class PyGameGUI:
         # Initialize the environment.
         self.timestep_watch.reset()
         timestep_result = self.env.new_episode()
-        self.agent.begin_episode()
+        for i in range(2):
+            self.agents[i].begin_episode()
 
-        is_human_agent = isinstance(self.agent, HumanAgent)
+        is_human_agent = isinstance(self.agents[0], HumanAgent)
         timestep_delay = self.HUMAN_TIMESTEP_DELAY if is_human_agent else self.AI_TIMESTEP_DELAY
 
         # Main game loop.
         running = True
         while running:
-            action = SnakeAction.MAINTAIN_DIRECTION
+            actions = [SnakeAction.MAINTAIN_DIRECTION for i in range(2)]
 
             # Handle events.
             for event in pygame.event.get():
                 if event.type == pygame.KEYDOWN:
                     if is_human_agent and event.key in self.SNAKE_CONTROL_KEYS:
-                        action = self.map_key_to_snake_action(event.key)
+                        for i in range(2):
+                            actions[i] = self.map_key_to_snake_action(event.key)
                     if event.key == pygame.K_ESCAPE:
                         raise QuitRequestedError
 
@@ -125,19 +127,47 @@ class PyGameGUI:
                 self.timestep_watch.reset()
 
                 if not is_human_agent:
-                    action = self.agent.act(timestep_result.observation, timestep_result.reward)
+                    for i in range(2):
+                        if i == 0:
+                            print("observation:")
+                            print(np.where(timestep_result[i].observation==21))
+                            print(timestep_result[i].observation)
+                            print(timestep_result[i].observation[np.where(timestep_result[i].observation==21)])
+			    # if agent 0 then agent's head is 2 and agent1 is ignore
+			    # 20 agent 0
+			    # 21 agent 1
+                            timestep_result[i].observation[np.where(timestep_result[i].observation==21)]=0
+                            timestep_result[i].observation[np.where(timestep_result[i].observation==20)]=2
+                            timestep_result[i].observation[np.where(timestep_result[i].observation==31)]=0
+                            timestep_result[i].observation[np.where(timestep_result[i].observation==30)]=3
+                            print(timestep_result[i].observation)
+                            #timestep_result[i].observation
+                        elif i == 1:
+                            timestep_result[i].observation[np.where(timestep_result[i].observation==21)]=2
+                            timestep_result[i].observation[np.where(timestep_result[i].observation==20)]=0
+                            timestep_result[i].observation[np.where(timestep_result[i].observation==30)]=0
+                            timestep_result[i].observation[np.where(timestep_result[i].observation==31)]=3
+                        #actions[i] = self.agents[i].act(timestep_result[i].observation, timestep_result[i].reward)	
+                        actions[i] = self.agents[i].act(timestep_result[i].observation, None)	
+                        print(actions)
 
-                self.env.choose_action(action)
+                self.env.choose_action(actions)
                 timestep_result = self.env.timestep()
 
-                if timestep_result.is_episode_end:
-                    self.agent.end_episode()
-                    running = False
+                for i in range(2):
+                    if timestep_result[i].is_episode_end:
+                        self.agents[i].end_episode()
+                        running = False
 
+                #if timestep_result[0].is_episode_end and timestep_result[1].is_episode_end:
+                #    self.agents[0].end_episode()
+                #    self.agents[1].end_episode()
+                #    running = False
             # Render.
             self.render()
-            score = self.env.snake.length - self.env.initial_snake_length
-            pygame.display.set_caption(f'Snake  [Score: {score:02d}]')
+            score0 = self.env.snakes[0].length - self.env.initial_snake_length
+            score1 = self.env.snakes[1].length - self.env.initial_snake_length
+            pygame.display.set_caption(f'[Score: {score0:02d}-{score1:02d}]')
             pygame.display.update()
             self.fps_clock.tick(self.FPS_LIMIT)
 
@@ -162,8 +192,12 @@ class Colors:
     SCREEN_BACKGROUND = (170, 204, 153)
     CELL_TYPE = {
         CellType.WALL: (56, 56, 56),
-        CellType.SNAKE_BODY: (105, 132, 164),
-        CellType.SNAKE_HEAD: (122, 154, 191),
+        #CellType.SNAKE_BODY0: (105, 132, 164),
+        #CellType.SNAKE_BODY1: (164, 132, 105),
+        CellType.SNAKE_HEAD0: (0, 120, 0),
+        CellType.SNAKE_HEAD1: (0, 0, 120),
+        CellType.SNAKE_BODY0: (0, 255, 0),
+        CellType.SNAKE_BODY1: (0, 0, 255),
         CellType.FRUIT: (173, 52, 80),
     }
 

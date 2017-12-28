@@ -22,8 +22,10 @@ class CellType(object):
 
     EMPTY = 0
     FRUIT = 1
-    SNAKE_HEAD = 2
-    SNAKE_BODY = 3
+    SNAKE_HEAD0 = 20
+    SNAKE_HEAD1 = 21
+    SNAKE_BODY0 = 30
+    SNAKE_BODY1 = 31
     WALL = 4
 
 
@@ -89,6 +91,16 @@ class Snake(object):
         return self.body[-1]
 
     @property
+    def _body(self):
+        """ Get the body of the snake's tail. """
+        return self.body
+
+    @property
+    def _direction(self):
+        """ Get the body of the snake's tail. """
+        return self.direction
+
+    @property
     def length(self):
         """ Get the current length of the snake. """
         return len(self.body)
@@ -116,6 +128,23 @@ class Snake(object):
         self.body.appendleft(self.peek_next_move())
         self.body.pop()
 
+    def valid(self, field, action, head, other):
+        direction_idx = self.directions.index(self.direction) 
+        next_direction = -1
+        if action == 0:
+            next_direction = self.direction
+        if action == 1:
+            next_direction = self.directions[direction_idx - 1]
+        elif action == 2:
+            next_direction = self.directions[(direction_idx + 1) % len(self.directions)]
+        if field[head + next_direction] != 0:
+            return False
+        for d in ALL_SNAKE_DIRECTIONS:
+            if other.head + d == head + next_direction:
+                return False
+        return True
+        
+
 
 class Field(object):
     """ Represents the playing field for the Snake game. """
@@ -131,8 +160,10 @@ class Field(object):
         self._cells = None
         self._empty_cells = set()
         self._level_map_to_cell_type = {
-            'S': CellType.SNAKE_HEAD,
-            's': CellType.SNAKE_BODY,
+            'A': CellType.SNAKE_HEAD0,
+            'B': CellType.SNAKE_HEAD1,
+            's': CellType.SNAKE_BODY0,
+            'x': CellType.SNAKE_BODY1,
             '#': CellType.WALL,
             'O': CellType.FRUIT,
             '.': CellType.EMPTY,
@@ -141,6 +172,8 @@ class Field(object):
             cell_type: symbol
             for symbol, cell_type in self._level_map_to_cell_type.items()
         }
+	#{20: 'A', 21: 'B', 3: 's', 4: '#', 1: 'O', 0: '.'}
+        print(self._cell_type_to_level_map)
 
     def __getitem__(self, point):
         """ Get the type of cell at the given point. """
@@ -186,11 +219,11 @@ class Field(object):
         except KeyError as err:
             raise ValueError(f'Unknown level map symbol: "{err.args[0]}"')
 
-    def find_snake_head(self):
+    def find_snake_head(self, head):
         """ Find the snake's head on the field. """
         for y in range(self.size):
             for x in range(self.size):
-                if self[(x, y)] == CellType.SNAKE_HEAD:
+                if self[(x, y)] == head:
                     return Point(x, y)
         raise ValueError('Initial snake position not specified on the level map')
 
@@ -198,13 +231,14 @@ class Field(object):
         """ Get the coordinates of a random empty cell. """
         return random.choice(list(self._empty_cells))
 
-    def place_snake(self, snake):
+    def place_snake(self, snakes):
         """ Put the snake on the field and fill the cells with its body. """
-        self[snake.head] = CellType.SNAKE_HEAD
-        for snake_cell in itertools.islice(snake.body, 1, len(snake.body)):
-            self[snake_cell] = CellType.SNAKE_BODY
+        for i in range(len(snakes)):
+            self[snakes[i].head] = 20 if i == 0 else 21#CellType.SNAKE_HEAD
+            for snake_cell in itertools.islice(snakes[i].body, 1, len(snakes[i].body)):
+                self[snake_cell] = CellType.SNAKE_BODY0 if i == 0 else CellType.SNAKE_BODY1
 
-    def update_snake_footprint(self, old_head, old_tail, new_head):
+    def update_snake_footprint(self, old_head, old_tail, new_head, i):
         """
         Update field cells according to the new snake position.
         
@@ -217,12 +251,12 @@ class Field(object):
             old_tail: position of the tail before the move.
             new_head: position of the head after the move.
         """
-        self[old_head] = CellType.SNAKE_BODY
+        self[old_head] = CellType.SNAKE_BODY0 if i == 0 else CellType.SNAKE_BODY1
 
         # If we've grown at this step, the tail cell shouldn't move.
         if old_tail:
             self[old_tail] = CellType.EMPTY
 
         # Support the case when we're chasing own tail.
-        if self[new_head] not in (CellType.WALL, CellType.SNAKE_BODY) or new_head == old_tail:
-            self[new_head] = CellType.SNAKE_HEAD
+        if self[new_head] not in (CellType.WALL, CellType.SNAKE_BODY0, CellType.SNAKE_BODY1) or new_head == old_tail:
+            self[new_head] = 20 if i == 0 else 21#CellType.SNAKE_HEAD

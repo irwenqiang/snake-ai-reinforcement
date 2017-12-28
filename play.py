@@ -27,7 +27,14 @@ def parse_command_line_args(args):
         help='Interface mode (command-line or GUI).',
     )
     parser.add_argument(
-        '--agent',
+        '--agent0',
+        required=True,
+        type=str,
+        choices=['human', 'dqn', 'random'],
+        help='Player agent to use.',
+    )
+    parser.add_argument(
+        '--agent1',
         required=True,
         type=str,
         choices=['human', 'dqn', 'random'],
@@ -47,7 +54,7 @@ def parse_command_line_args(args):
     parser.add_argument(
         '--num-episodes',
         type=int,
-        default=10,
+        default=200,
         help='The number of episodes to run consecutively.',
     )
 
@@ -60,7 +67,7 @@ def create_snake_environment(level_filename):
     with open(level_filename) as cfg:
         env_config = json.load(cfg)
 
-    return Environment(config=env_config, verbose=1)
+    return Environment(config=env_config, verbose=2)
 
 
 def load_model(filename):
@@ -154,10 +161,11 @@ def main():
 
     env = create_snake_environment(parsed_args.level)
     model = load_model(parsed_args.model) if parsed_args.model is not None else None
-    agent = create_agent(parsed_args.agent, model)
+    agents = [create_agent(parsed_args.agent0, model), create_agent(parsed_args.agent1, model)]
+    #agent = create_agent(parsed_args.agent, model)
 
     run_player = play_cli if parsed_args.interface == 'cli' else play_gui
-    run_player(env, agent, num_episodes=parsed_args.num_episodes)
+    run_player(env, agents, num_episodes=parsed_args.num_episodes)
 
 
 if __name__ == '__main__':
